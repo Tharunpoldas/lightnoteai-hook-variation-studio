@@ -11,7 +11,12 @@ import "./styles.css";
 
 const API_BASE =
   import.meta.env.VITE_API_URL ||
-  window.location.origin;
+  (
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1"
+      ? "http://127.0.0.1:8000"
+      : window.location.origin
+  );
 
 // ============================================================
 // APP
