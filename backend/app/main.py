@@ -164,16 +164,22 @@ FRONTEND_DIR = (
     / "dist"
 )
 
-
 if FRONTEND_DIR.exists():
-    app.mount(
-    "/",
-    StaticFiles(
-        directory=FRONTEND_DIR,
-        html=True,
-    ),
-    name="frontend",
-)
+
+    ASSETS_DIR = (
+        FRONTEND_DIR
+        / "assets"
+    )
+
+    if ASSETS_DIR.exists():
+
+        app.mount(
+            "/assets",
+            StaticFiles(
+                directory=ASSETS_DIR
+            ),
+            name="assets",
+        )
 
 # ============================================================
 # PYDANTIC MODELS
@@ -1098,7 +1104,6 @@ def frontend_fallback(
         / "index.html"
     )
 
-
     if (
         index_file.exists()
         and not full_path.startswith(
@@ -1110,11 +1115,7 @@ def frontend_fallback(
             index_file
         )
 
-
     raise HTTPException(
-
         status_code=404,
-
         detail="Not found.",
-
     )
