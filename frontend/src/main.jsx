@@ -65,7 +65,7 @@ function App() {
 
         const response =
           await fetch(
-            `${API}/api/jobs/${jobId}?t=${Date.now()}`,
+            `${API_BASE}/api/jobs/${jobId}?t=${Date.now()}`,
             {
               method: "GET",
 
@@ -323,7 +323,7 @@ function App() {
 
       const response =
         await fetch(
-          `${API}/api/jobs`,
+          `${API_BASE}/api/jobs`,
           {
             method: "POST",
             body: form,
@@ -1288,7 +1288,7 @@ function App() {
                       preload="metadata"
 
                       src={
-                        `${API}/api/jobs/` +
+                        `${API_BASE}/api/jobs/` +
                         `${job.job_id}/source`
                       }
 
@@ -1550,7 +1550,7 @@ function App() {
 
                     const clipUrl =
                       variation?.clip_url
-                        ? `${API}${variation.clip_url}`
+                        ? `${API_BASE}${variation.clip_url}`
                         : null;
 
 

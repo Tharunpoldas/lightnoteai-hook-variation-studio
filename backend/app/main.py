@@ -166,16 +166,14 @@ FRONTEND_DIR = (
 
 
 if FRONTEND_DIR.exists():
-
     app.mount(
-        "/app",
-        StaticFiles(
-            directory=FRONTEND_DIR,
-            html=True,
-        ),
-        name="frontend",
-    )
-
+    "/",
+    StaticFiles(
+        directory=FRONTEND_DIR,
+        html=True,
+    ),
+    name="frontend",
+)
 
 # ============================================================
 # PYDANTIC MODELS
