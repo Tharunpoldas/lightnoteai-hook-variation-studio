@@ -1220,6 +1220,10 @@ def analyze_with_gemini(
 # CREATE OUTPUT HOOK CLIPS
 # ============================================================
 
+# ============================================================
+# CREATE OUTPUT HOOK CLIPS - MEMORY OPTIMIZED
+# ============================================================
+
 def create_hook_variation_clips(
     video_path: Path,
     output_dir: Path,
@@ -1238,7 +1242,7 @@ def create_hook_variation_clips(
     )
 
     actual_duration = min(
-        hook_seconds,
+        max(hook_seconds, 0.5),
         duration
     )
 
@@ -1247,12 +1251,107 @@ def create_hook_variation_clips(
     print("=" * 70)
     print(
         f"[FFmpeg] Creating "
-        f"{len(variations)} hook clips"
+        f"{len(variations)} memory-optimized hook clips"
     )
     print("=" * 70)
 
-    # Slight visual treatments
-    # for comparison/demo purposes.
+    # --------------------------------------------------------
+    # Create ONE low-resolution source.
+    #
+    # This avoids decoding the original high-resolution
+    # video repeatedly for every variation.
+    # --------------------------------------------------------
+
+    render_source = (
+        output_dir
+        / "_hook_source.mp4"
+    )
+
+    print(
+        "[FFmpeg] Creating low-memory hook source..."
+    )
+
+    source_command = [
+
+        ffmpeg_path(),
+
+        "-y",
+
+        "-threads",
+        "1",
+
+        "-ss",
+        "0",
+
+        "-i",
+        str(video_path),
+
+        "-t",
+        str(actual_duration),
+
+        # Reduce resolution before variation processing.
+        "-vf",
+        "scale='min(540,iw)':-2",
+
+        "-an",
+
+        "-c:v",
+        "libx264",
+
+        "-preset",
+        "ultrafast",
+
+        "-crf",
+        "30",
+
+        "-pix_fmt",
+        "yuv420p",
+
+        "-movflags",
+        "+faststart",
+
+        str(render_source)
+
+    ]
+
+    result = subprocess.run(
+        source_command,
+        capture_output=True,
+        text=True
+    )
+
+    if result.returncode != 0:
+
+        print(
+            "[FFmpeg] Failed to create "
+            "low-memory hook source."
+        )
+
+        print(
+            result.stderr
+        )
+
+        raise RuntimeError(
+            "FFmpeg could not create "
+            "the optimized hook source."
+        )
+
+    if not render_source.exists():
+
+        raise RuntimeError(
+            "Optimized hook source was not created."
+        )
+
+    print(
+        "[FFmpeg] Low-memory hook source ready."
+    )
+
+    # --------------------------------------------------------
+    # Lightweight visual treatments.
+    #
+    # These operate on the already downscaled source.
+    # --------------------------------------------------------
+
     treatments = [
 
         "scale=iw*1.02:ih*1.02,"
@@ -1261,133 +1360,158 @@ def create_hook_variation_clips(
         "scale=iw*1.03:ih*1.03,"
         "crop=iw/1.03:ih/1.03",
 
-        "scale=iw*1.04:ih*1.04,"
-        "crop=iw/1.04:ih/1.04",
+        "eq=contrast=1.04:saturation=1.04",
 
-        "eq=contrast=1.05:saturation=1.05",
+        "eq=contrast=1.06:brightness=0.01",
 
-        "eq=contrast=1.08:brightness=0.02",
+        "eq=contrast=1.08:saturation=1.06",
 
         "scale=iw*1.025:ih*1.025,"
         "crop=iw/1.025:ih/1.025",
 
-        "eq=contrast=1.03:saturation=1.10",
+        "eq=contrast=1.03:saturation=1.08",
 
-        "scale=iw*1.05:ih*1.05,"
-        "crop=iw/1.05:ih/1.05",
+        "scale=iw*1.04:ih*1.04,"
+        "crop=iw/1.04:ih/1.04",
 
-        "eq=contrast=1.06:brightness=0.01",
+        "eq=contrast=1.05:brightness=0.01",
 
         "scale=iw*1.02:ih*1.02,"
         "crop=iw/1.02:ih/1.02"
 
     ]
 
-    for index, variation in enumerate(
-        variations,
-        start=1
-    ):
+    try:
 
-        output_path = (
-            output_dir
-            / f"variation_{index}.mp4"
-        )
+        # ----------------------------------------------------
+        # Create each variation SEQUENTIALLY.
+        # ----------------------------------------------------
 
-        print(
-            f"[FFmpeg] Creating "
-            f"variation {index}/"
-            f"{len(variations)}..."
-        )
+        for index, variation in enumerate(
+            variations,
+            start=1
+        ):
 
-        filter_expression = (
-            treatments[
-                (index - 1)
-                % len(treatments)
+            output_path = (
+                output_dir
+                / f"variation_{index}.mp4"
+            )
+
+            print(
+                f"[FFmpeg] Creating "
+                f"variation {index}/"
+                f"{len(variations)}..."
+            )
+
+            filter_expression = (
+                treatments[
+                    (index - 1)
+                    % len(treatments)
+                ]
+            )
+
+            command = [
+
+                ffmpeg_path(),
+
+                "-y",
+
+                "-threads",
+                "1",
+
+                "-i",
+                str(render_source),
+
+                "-t",
+                str(actual_duration),
+
+                "-vf",
+                filter_expression,
+
+                "-an",
+
+                "-c:v",
+                "libx264",
+
+                "-preset",
+                "ultrafast",
+
+                "-crf",
+                "30",
+
+                "-pix_fmt",
+                "yuv420p",
+
+                "-movflags",
+                "+faststart",
+
+                str(output_path)
+
             ]
-        )
 
-        command = [
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True
+            )
 
-            ffmpeg_path(),
+            if result.returncode != 0:
 
-            "-y",
+                print(
+                    f"[FFmpeg] Variation "
+                    f"{index} failed"
+                )
 
-            "-ss",
-            "0",
+                print(
+                    result.stderr
+                )
 
-            "-i",
-            str(video_path),
+                raise RuntimeError(
+                    f"FFmpeg failed for "
+                    f"variation {index}."
+                )
 
-            "-t",
-            str(actual_duration),
+            if not output_path.exists():
 
-            "-vf",
-            filter_expression,
+                raise RuntimeError(
+                    f"Variation {index} "
+                    f"was not created."
+                )
 
-            "-an",
-
-            "-c:v",
-            "libx264",
-
-            "-preset",
-            "veryfast",
-
-            "-crf",
-            "27",
-
-            "-pix_fmt",
-            "yuv420p",
-
-            "-movflags",
-            "+faststart",
-
-            str(output_path)
-
-        ]
-
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True
-        )
-
-        if result.returncode != 0:
-
-            print(
-                f"[FFmpeg] "
-                f"Variation {index} failed"
+            clips.append(
+                output_path
             )
 
             print(
-                result.stderr
+                f"[FFmpeg] Variation "
+                f"{index} created successfully."
             )
 
-            raise RuntimeError(
-                f"FFmpeg failed for "
-                f"variation {index}."
+    finally:
+
+        # ----------------------------------------------------
+        # Always remove temporary source.
+        # ----------------------------------------------------
+
+        try:
+
+            if render_source.exists():
+                render_source.unlink()
+
+        except Exception as cleanup_error:
+
+            print(
+                "[FFmpeg] Could not remove "
+                f"temporary source: {cleanup_error}"
             )
-
-        if not output_path.exists():
-
-            raise RuntimeError(
-                f"Variation {index} "
-                f"was not created."
-            )
-
-        clips.append(
-            output_path
-        )
-
-        print(
-            f"[FFmpeg] Variation "
-            f"{index} created successfully."
-        )
 
     print("=" * 70)
+
     print(
         f"[FFmpeg] Created "
         f"{len(clips)} clips successfully."
     )
+
     print("=" * 70)
 
     return clips
